@@ -1,0 +1,13 @@
+{
+  "title": "PulseRoute API",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Request volume / sec", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "targets": [{"expr": "sum(rate(pulseroute_http_requests_total[5m]))", "refId": "A"}]},
+    {"id": 2, "type": "timeseries", "title": "Request latency p95", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "targets": [{"expr": "histogram_quantile(0.95, sum(rate(pulseroute_request_duration_seconds_bucket[5m])) by (le))", "refId": "A"}]},
+    {"id": 3, "type": "timeseries", "title": "HTTP error rate", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "targets": [{"expr": "sum(rate(pulseroute_http_errors_total[5m])) / clamp_min(sum(rate(pulseroute_http_requests_total[5m])), 1)", "refId": "A"}]},
+    {"id": 4, "type": "timeseries", "title": "Prediction traffic", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "targets": [{"expr": "sum(rate(pulseroute_predictions_total[5m])) by (outcome)", "refId": "A"}]},
+    {"id": 5, "type": "timeseries", "title": "Service readiness", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "targets": [{"expr": "pulseroute_service_ready", "refId": "A"}]},
+    {"id": 6, "type": "stat", "title": "Loaded model version", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "targets": [{"expr": "pulseroute_model_version", "refId": "A"}]}
+  ]
+}

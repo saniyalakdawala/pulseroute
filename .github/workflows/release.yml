@@ -1,0 +1,19 @@
+name: Manual container release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    environment: release-approval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker build -t ghcr.io/${{ github.repository }}/pulseroute:${{ github.sha }} .
+      - run: docker push ghcr.io/${{ github.repository }}/pulseroute:${{ github.sha }}

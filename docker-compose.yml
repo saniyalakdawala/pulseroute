@@ -1,0 +1,16 @@
+services:
+  api:
+    build: .
+    ports: ["${PULSEROUTE_API_PORT:-8000}:8000"]
+    environment: {PULSEROUTE_MODEL: /app/artifacts/champion.joblib}
+    volumes: ["./artifacts:/app/artifacts:ro"]
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports: ["${PULSEROUTE_PROMETHEUS_PORT:-9090}:9090"]
+    volumes: ["./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    depends_on: [api]
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports: ["${PULSEROUTE_GRAFANA_PORT:-3000}:3000"]
+    volumes: ["./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro", "./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro"]
+    depends_on: [prometheus]
