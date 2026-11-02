@@ -1,10 +1,10 @@
 """Streamlit prediction and lifecycle overview."""
 import os, json
 from pathlib import Path
-import joblib
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
+from pulseroute.model_loading import load_model
 
 st.set_page_config(page_title="PulseRoute AI",page_icon="🚇",layout="wide")
 st.title("🚇 PulseRoute AI")
@@ -17,7 +17,12 @@ model_path=Path(os.getenv("PULSEROUTE_MODEL",str(artifact_dir/"champion.joblib")
 if not model_path.exists():
     st.warning("No champion model is available yet. Follow the training steps in README.md.")
 else:
-    model=joblib.load(model_path)
+    try:
+        model=load_model(model_path)
+    except Exception as exc:
+        st.error(f"The saved model is incompatible with this app environment: {exc}")
+        st.info("Use the pinned requirements.txt and restart or redeploy the app.")
+        st.stop()
     route=st.text_input("Route ID", "Red")
     col1,col2,col3=st.columns(3)
     direction=col1.selectbox("Direction",["0","1"]); seq=col2.number_input("Stop sequence",1,300,10); hour=col3.slider("Scheduled hour",0,23,8)

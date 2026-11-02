@@ -1,4 +1,4 @@
-import datetime, zoneinfo
+import datetime, zoneinfo, json
 import numpy as np
 import pandas as pd
 from pulseroute.data import prepare
@@ -6,6 +6,7 @@ from pulseroute.training import evaluate
 from pulseroute.training import train, promote
 from pulseroute.drift import simulate
 from pulseroute import api
+from pulseroute.model_loading import load_model
 
 def test_prepare_constructs_actual_schedule_delay_label():
     midnight=datetime.datetime(2024,1,1,tzinfo=zoneinfo.ZoneInfo("America/New_York")).timestamp()
@@ -28,6 +29,14 @@ def test_metrics_and_api_health_without_model(tmp_path,monkeypatch):
     from prometheus_client import generate_latest
     assert b"pulseroute_http_requests_total" in generate_latest()
 
+def test_model_loader_rejects_scikit_learn_version_mismatch(tmp_path):
+    model=tmp_path/"champion.joblib"
+    model.write_bytes(b"not loaded because the metadata version is incompatible")
+    model.with_suffix(".metadata.json").write_text(json.dumps({"scikit_learn":"0.0.0"}),encoding="utf-8")
+    import pytest
+    with pytest.raises(RuntimeError,match="dependency mismatch"):
+        load_model(model)
+
 def test_candidate_approval_promotion_and_rollback(tmp_path,monkeypatch):
     # Deterministic behavior fixture only; not evidence of real-world model quality.
     dates=pd.date_range("2024-01-01",periods=160)
@@ -39,6 +48,8 @@ def test_candidate_approval_promotion_and_rollback(tmp_path,monkeypatch):
     artifacts=tmp_path/"artifacts"; train(source,artifacts)
     assert promote(artifacts,False)["status"]=="approval_required"
     assert promote(artifacts,True)["status"]=="Champion"
+    assert (artifacts/"champion.metadata.json").exists()
+    assert load_model(artifacts/"champion.joblib") is not None
     train(source,artifacts); promoted=promote(artifacts,True)
     assert promoted["status"]=="Champion"
     assert promote(artifacts,True,rollback=True)["status"]=="Champion"

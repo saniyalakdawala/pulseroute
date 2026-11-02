@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json, os, hashlib
 import tempfile
+import platform
 from pathlib import Path
 import joblib
 import numpy as np
@@ -66,6 +67,8 @@ def train(data_path: Path, artifacts: Path, tracking_uri: str | None = None) -> 
     shutil.copy2(model_path,artifacts/"candidate.joblib")
     sha=hashlib.sha256(model_path.read_bytes()).hexdigest()
     report={"winner":winner,"dataset_source_kind":dataset_metadata.get("source_kind","UNSPECIFIED"),"metrics":{n:{k:v for k,v in m.items() if k!="pipeline"} for n,m in results.items()},"features":FEATURES,"target":"actual stop arrival more than 5 minutes after scheduled arrival","train_rows":len(tr),"holdout_rows":len(te),"holdout_start":str(te.service_date.min()),"sha256":sha,"status":"Candidate"}
+    report["environment"]={"python":platform.python_version(),"scikit_learn":__import__("sklearn").__version__,"numpy":np.__version__,"pandas":pd.__version__,"scipy":__import__("scipy").__version__,"joblib":joblib.__version__}
+    (artifacts/version_path.with_suffix(".metadata.json").name).write_text(json.dumps(report["environment"],indent=2),encoding="utf-8")
     (artifacts/"evaluation.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
     registry=artifacts/"registry.json"
     if not registry.exists(): registry.write_text(json.dumps({"versions":[],"history":[]},indent=2),encoding="utf-8")
@@ -97,6 +100,8 @@ def promote(artifacts: Path, approve: bool, rollback: bool=False) -> dict:
     selected["status"]="Champion"
     import shutil
     shutil.copy2(artifacts/selected["model"], artifacts/"champion.joblib")
+    metadata_source=artifacts/selected["model"].replace(".joblib",".metadata.json")
+    if (artifacts/metadata_source).exists(): shutil.copy2(artifacts/metadata_source,artifacts/"champion.metadata.json")
     state["history"].append({"action":"rollback" if rollback else "promote","version":selected["version"],"at":pd.Timestamp.utcnow().isoformat(),"reason":"operator-approved candidate met champion F1 gate" if approve else "operator rollback"})
     registry.write_text(json.dumps(state,indent=2),encoding="utf-8")
     return {"status":"Champion","version":selected["version"],"sha256":selected["sha256"]}

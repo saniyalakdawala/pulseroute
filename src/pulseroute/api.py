@@ -2,11 +2,11 @@
 from __future__ import annotations
 import os, time
 from pathlib import Path
-import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, Gauge, make_asgi_app
+from pulseroute.model_loading import load_model
 
 app=FastAPI(title="PulseRoute AI",version="0.1.0",description="MBTA subway stop delay risk demo")
 REQ=Counter("pulseroute_http_requests_total","HTTP requests","method","path","status")
@@ -22,7 +22,7 @@ def model_path(): return Path(os.getenv("PULSEROUTE_MODEL","artifacts/champion.j
 def get_model():
     p=model_path()
     if not p.exists(): raise RuntimeError(f"Model not found at {p}; train then promote a model")
-    return joblib.load(p)
+    return load_model(p)
 
 class Journey(BaseModel):
     route_id: str = Field(min_length=1,max_length=40)

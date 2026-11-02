@@ -39,7 +39,7 @@ Copy-Item .env.example .env
 pip install -e ".[dev]"
 ```
 
-Python 3.10+ is declared in packaging; CI and the container use Python 3.11, and this workspace verification used Python 3.13.5. For offline UI/API smoke tests, dependencies must already be installed; dataset acquisition requires internet access.
+Use Python 3.13 for this serialized model. The project pins the model's training stack, and this workspace used Python 3.13.5. For offline UI/API smoke tests, dependencies must already be installed; dataset acquisition requires internet access.
 
 ## Data, training, and MLflow
 
@@ -50,7 +50,7 @@ python scripts/pr_cli.py train
 mlflow ui --backend-store-uri sqlite:///./mlflow.db --host 127.0.0.1 --port 5000
 ```
 
-Training compares a prior majority classifier, balanced Logistic Regression, Random Forest, and histogram gradient boosting. Preprocessing and model are fitted together in a scikit-learn pipeline. Metrics include precision, recall, F1, ROC-AUC where both classes exist, accuracy, and confusion matrix. The selected candidate is saved as `artifacts/candidate.joblib`; an evaluation report and `registry.json` record the version and checksum. Runs use a local SQLite MLflow tracking (`mlflow.db`) by default. To use a remote MLflow server, set `MLFLOW_TRACKING_URI` to its URI; external artifact storage/server configuration is the operator's responsibility.
+Training compares a prior majority classifier, balanced Logistic Regression, Random Forest, and histogram gradient boosting. Preprocessing and model are fitted together in a scikit-learn pipeline. Metrics include precision, recall, F1, ROC-AUC where both classes exist, accuracy, and confusion matrix. The selected candidate is saved as `artifacts/candidate.joblib`; an evaluation report and `registry.json` record the version and checksum. Training also writes model dependency metadata beside each model artifact. The project pins scikit-learn to `1.6.0`, matching the model that was trained for this project. Keep training and serving versions aligned; cross-version loading of joblib models is unsupported by scikit-learn ([model persistence guidance](https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations)). Runs use a local SQLite MLflow tracking (`mlflow.db`) by default. To use a remote MLflow server, set `MLFLOW_TRACKING_URI` to its URI; external artifact storage/server configuration is the operator's responsibility.
 
 The local JSON registry manifest is intentionally not described as MLflow Model Registry. Promotion requires a manual command (`python scripts/pr_cli.py promote`) and rollback selects the most recently archived champion (`python scripts/pr_cli.py rollback`). Promotion compares candidate and champion F1 and rejects a lower-scoring candidate; the first candidate requires explicit operator approval through the command. The demo workflow records lifecycle history. In a production deployment add policy thresholds for other metrics and concurrent-write locking.
 
@@ -86,7 +86,7 @@ API endpoints: `GET /health`, `GET /model`, `POST /predict`, and `GET /metrics`.
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/predict -ContentType 'application/json' -Body '{"route_id":"Red","direction_id":"0","stop_sequence":10,"hour":8,"day_of_week":1,"month":6}'
 ```
 
-The model version in the API comes from the promoted local registry manifest. Streamlit Community Cloud deployment: push this folder to a GitHub repository and select `app/streamlit_app.py` as the entry point. After training and promotion, include the model using PowerShell: `Copy-Item artifacts\\champion.joblib app\\champion.joblib`, then set `PULSEROUTE_MODEL=app/champion.joblib` in the app settings. Check repository size and data policy before committing the model copy. This repository ignores model artifacts; no public deployment has been performed.
+The model version in the API comes from the promoted local registry manifest. Streamlit Community Cloud deployment: push this folder to a GitHub repository and select `app/streamlit_app.py` as the entry point. Select **Python 3.13** in Advanced settings to match the training runtime. If the app was already deployed with another Python version, Community Cloud requires deleting and redeploying it to change Python. After training and promotion, copy the model using PowerShell: `Copy-Item artifacts\\champion.joblib app\\champion.joblib`. If `artifacts\\champion.metadata.json` exists, copy it too: `Copy-Item artifacts\\champion.metadata.json app\\champion.metadata.json`. Commit and push these app files and the updated `requirements.txt`/`pyproject.toml`. In Community Cloud, set `PULSEROUTE_MODEL=app/champion.joblib` if you use that path. Check repository size and data policy before committing the model copy. This repository ignores model artifacts; no public deployment has been performed.
 
 ## Docker, monitoring, Kubernetes, Terraform
 
@@ -113,4 +113,5 @@ Run tests with `pytest -q`. Never expose real passenger identifiers (the model t
 - If acquisition returns a schema mismatch or an MBTA partition is unavailable, inspect `data/raw/index.csv` and the LAMP data dictionary; MBTA notes exports may change.
 - If training finds a single class in a temporal holdout, acquire additional service dates or change the documented observation window after inspecting class distribution.
 - If health reports `model_unavailable`, train and explicitly promote a candidate.
+- If the deployed page reports a scikit-learn version mismatch, push the pinned requirements and let Community Cloud rebuild the environment. The packaged model was trained with scikit-learn 1.6.0. Do not suppress the warning or load a model from an untrusted source.
 - If Compose cannot start, verify Docker Desktop is running and ports 3000, 8000, and 9090 are free.
